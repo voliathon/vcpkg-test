@@ -3,5 +3,6 @@
   "version-string": "0.1.0",
   "dependencies": [
     "ms-gsl"
-  ]
+  ],
+  "builtin-baseline": "a794331a4325a828a16496ccc74f14a605f778a6"
 }
