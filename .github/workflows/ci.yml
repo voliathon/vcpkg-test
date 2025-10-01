@@ -1,35 +1,40 @@
 name: Vcpkg C++ CI
 
-on: [push, pull_request]
+on: [push]
+
+env:
+  VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
+  VCPKG_DEFAULT_TRIPLET: x64-windows
 
 jobs:
   build:
-    name: ${{ matrix.os }} - ${{ matrix.triplet }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest]
-        triplet: [x64-windows]
+    name: Build C++ Project
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout vcpkg submodule
-        run: git submodule update --init --recursive
+      - name: Clone vcpkg
+        run: git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+        shell: pwsh
+      
+      - name: Bootstrap vcpkg
+        run: |
+          if (-not (Test-Path "${{ env.VCPKG_ROOT }}/vcpkg.exe")) {
+            & "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+          }
+        shell: pwsh
 
-      - name: Set up vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          runVcpkgInstall: true
-          vcpkgTriplet: ${{ matrix.triplet }}
-          vcpkgJsonGlob: '**/vcpkg.json'
+      - name: Install dependencies
+        run: |
+          & "${{ env.VCPKG_ROOT }}/vcpkg" install --x-manifest-root="${{ github.workspace }}" --triplet "${{ env.VCPKG_DEFAULT_TRIPLET }}"
+        shell: pwsh
 
       - name: Add MSBuild to Path
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build C++ Code
         run: |
-          cl.exe /EHsc /std:c++17 main.cpp /I"${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include" /link /LIBPATH:"${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
+          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include" /link /LIBPATH:"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/lib"
         shell: cmd
