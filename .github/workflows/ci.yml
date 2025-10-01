@@ -1,48 +1,27 @@
-name: Vcpkg C++ CI
+name: CMake with vcpkg
 
-on: [push]
-
-env:
-  VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
-  VCPKG_DEFAULT_TRIPLET: x64-windows
+on:
+  push:
+  pull_request:
 
 jobs:
   build:
-    name: Build C++ Project
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Manually Set Up vcpkg
-        shell: pwsh
-        run: |
-          # Remove the existing submodule directory to ensure a clean clone
-          if (Test-Path "${{ env.VCPKG_ROOT }}") {
-            Remove-Item -Recurse -Force "${{ env.VCPKG_ROOT }}"
-          }
-          
-          # Clone a fresh, full copy of vcpkg
-          git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
-          
-          # Checkout the specific baseline commit
-          cd "${{ env.VCPKG_ROOT }}"
-          git checkout "dcde712168c5b165e31b7943c2c5ed265a7c2936"
-          cd "${{ github.workspace }}"
-          
-          # Bootstrap vcpkg
-          & "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
 
-      - name: Install dependencies
-        run: |
-          & "${{ env.VCPKG_ROOT }}/vcpkg" install --x-manifest-root="${{ github.workspace }}" --triplet "${{ env.VCPKG_DEFAULT_TRIPLET }}"
-        shell: pwsh
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh
 
-      - name: Add MSBuild to Path
-        uses: microsoft/setup-msbuild@v1.1
+      - name: Configure CMake with vcpkg toolchain
+        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build C++ Code
-        run: |
-          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include" /link /LIBPATH:"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/lib"
-        shell: cmd
+      - name: Build
+        run: cmake --build build --config Release
