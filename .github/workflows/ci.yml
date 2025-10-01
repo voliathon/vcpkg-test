@@ -8,15 +8,17 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository and submodules
+      - name: Checkout repository with full history
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+          fetch-depth: 0 # This is the crucial change to ensure full history
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: 'a794331a4325a828a16496ccc74f14a605f778a6' # Explicitly set the commit
           runVcpkgInstall: true
 
       - name: Add MSBuild to Path
