@@ -14,7 +14,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # We will initialize submodules in a separate step
+
+      - name: List files in the root directory
+        run: ls -R
+
+      - name: Display .gitmodules content
+        run: |
+          if (Test-Path ".gitmodules") {
+            Get-Content .gitmodules
+          } else {
+            Write-Host ".gitmodules not found"
+          }
+        shell: pwsh
 
       - name: Initialize and update submodules
         run: git submodule update --init --recursive
