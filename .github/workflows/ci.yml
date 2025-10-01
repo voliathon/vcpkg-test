@@ -3,6 +3,7 @@ name: Minimal Vcpkg CI Test
 on: [push]
 
 env:
+  # Using an environment variable for the vcpkg root makes the workflow easier to read.
   VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
   VCPKG_DEFAULT_TRIPLET: x64-windows
 
@@ -15,6 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # This is crucial to ensure the vcpkg submodule is checked out.
           submodules: 'recursive'
 
       - name: Verify Submodule Checkout
@@ -29,7 +31,11 @@ jobs:
       - name: Cache vcpkg dependencies
         uses: actions/cache@v3
         with:
-          path: ${{ env.VCPKG_ROOT }}/installed
+          # Caching more than just the 'installed' directory can speed up builds.
+          path: |
+            ${{ env.VCPKG_ROOT }}/installed
+            ${{ env.VCPKG_ROOT }}/packages
+            ${{ env.VCPKG_ROOT }}/.vcpkg-root
           key: ${{ runner.os }}-${{ env.VCPKG_DEFAULT_TRIPLET }}-${{ hashFiles('vcpkg.json') }}
 
       - name: Bootstrap vcpkg
@@ -41,18 +47,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" install --x-manifest-root="${{ github.workspace }}"
+          # Use the modern manifest-based installation.
+          & "${{ env.VCPKG_ROOT }}/vcpkg" install --x-manifest-root="${{ github.workspace }}" --triplet "${{ env.VCPKG_DEFAULT_TRIPLET }}"
         shell: pwsh
-      
-      - name: Integrate vcpkg with MSBuild
-        run: |
-          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" integrate install
-        shell: pwsh
+
+      # This step is removed as it's not needed for command-line builds.
+      # - name: Integrate vcpkg with MSBuild
+      #  run: |
+      #    & "${{ env.VCPKG_ROOT }}/vcpkg.exe" integrate install
+      #  shell: pwsh
 
       - name: Add MSBuild to Path
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build C++ Code
         run: |
-          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include"
+          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include" /link /LIBPATH:"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/lib"
         shell: cmd
