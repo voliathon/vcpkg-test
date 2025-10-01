@@ -2,29 +2,47 @@ name: Vcpkg C++ CI
 
 on: [push]
 
+env:
+  VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
+  VCPKG_DEFAULT_TRIPLET: x64-windows
+
 jobs:
   build:
     name: Build C++ Project
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository with full history
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          fetch-depth: 0 # This is the crucial change to ensure full history
 
-      - name: Set up vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          vcpkgGitCommitId: 'a794331a4325a828a16496ccc74f14a605f778a6' # Explicitly set the commit
-          runVcpkgInstall: true
+      - name: Manually Set Up vcpkg
+        shell: pwsh
+        run: |
+          # Remove the existing submodule directory to ensure a clean clone
+          if (Test-Path "${{ env.VCPKG_ROOT }}") {
+            Remove-Item -Recurse -Force "${{ env.VCPKG_ROOT }}"
+          }
+          
+          # Clone a fresh, full copy of vcpkg
+          git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
+          
+          # Checkout the specific baseline commit
+          cd "${{ env.VCPKG_ROOT }}"
+          git checkout "dcde712168c5b165e31b7943c2c5ed265a7c2936"
+          cd "${{ github.workspace }}"
+          
+          # Bootstrap vcpkg
+          & "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+
+      - name: Install dependencies
+        run: |
+          & "${{ env.VCPKG_ROOT }}/vcpkg" install --x-manifest-root="${{ github.workspace }}" --triplet "${{ env.VCPKG_DEFAULT_TRIPLET }}"
+        shell: pwsh
 
       - name: Add MSBuild to Path
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build C++ Code
         run: |
-          cl.exe /EHsc /std:c++17 main.cpp /I"${{ github.workspace }}/vcpkg/installed/x64-windows/include" /link /LIBPATH:"${{ github.workspace }}/vcpkg/installed/x64-windows/lib"
+          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include" /link /LIBPATH:"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/lib"
         shell: cmd
