@@ -22,7 +22,7 @@ jobs:
       - name: Add MSBuild to Path
         uses: microsoft/setup-msbuild@v1.1
 
-      - name of: Build C++ Code
+      - name: Build C++ Code
         run: |
           cl.exe /EHsc /std:c++17 main.cpp /I"${{ github.workspace }}/vcpkg/installed/x64-windows/include" /link /LIBPATH:"${{ github.workspace }}/vcpkg/installed/x64-windows/lib"
         shell: cmd
