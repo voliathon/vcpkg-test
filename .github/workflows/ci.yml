@@ -14,10 +14,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          # The 'fetch-depth: 1' line has been removed to ensure a full clone,
-          # which is more reliable for submodule checkouts.
+        # We will initialize submodules in a separate step
+
+      - name: Initialize and update submodules
+        run: git submodule update --init --recursive
 
       - name: Verify Submodule Checkout
         run: |
