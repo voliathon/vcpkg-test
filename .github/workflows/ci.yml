@@ -1,0 +1,49 @@
+name: Minimal Vcpkg CI Test
+
+on: [push]
+
+env:
+  VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
+  VCPKG_DEFAULT_TRIPLET: x64-windows
+
+jobs:
+  build:
+    name: Build Minimal Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Cache vcpkg dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.VCPKG_ROOT }}/installed
+          key: ${{ runner.os }}-${{ env.VCPKG_DEFAULT_TRIPLET }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Bootstrap vcpkg
+        run: |
+          if (-not (Test-Path "${{ env.VCPKG_ROOT }}/vcpkg.exe")) {
+            & "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+          }
+        shell: pwsh
+
+      - name: Install dependencies
+        run: |
+          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" install
+        shell: pwsh
+      
+      - name: Integrate vcpkg with MSBuild
+        run: |
+          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" integrate install
+        shell: pwsh
+
+      - name: Add MSBuild to Path
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build C++ Code
+        run: |
+          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include"
+        shell: cmd
