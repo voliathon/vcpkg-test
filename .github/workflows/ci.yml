@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clone vcpkg
+      - name: Clone vcpkg with full history
         run: git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
         shell: pwsh
       
