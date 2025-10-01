@@ -1,71 +1,35 @@
-name: Minimal Vcpkg CI Test
+name: Vcpkg C++ CI
 
-on: [push]
-
-env:
-  VCPKG_ROOT: "${{ github.workspace }}/vcpkg"
-  VCPKG_DEFAULT_TRIPLET: x64-windows
+on: [push, pull_request]
 
 jobs:
   build:
-    name: Build Minimal Test
-    runs-on: windows-latest
+    name: ${{ matrix.os }} - ${{ matrix.triplet }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+        triplet: [x64-windows]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: List files in the root directory
-        run: ls -R
-
-      - name: Display .gitmodules content
-        run: |
-          if (Test-Path ".gitmodules") {
-            Get-Content .gitmodules
-          } else {
-            Write-Host ".gitmodules not found"
-          }
-        shell: pwsh
-
-      - name: Initialize and update submodules
+      - name: Checkout vcpkg submodule
         run: git submodule update --init --recursive
 
-      - name: Verify Submodule Checkout
-        run: |
-          if (-not (Test-Path "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat")) {
-            Write-Error "vcpkg submodule not found at ${{ env.VCPKG_ROOT }}! Checkout failed."
-            exit 1
-          }
-          Write-Host "vcpkg submodule found."
-        shell: pwsh
-
-      - name: Cache vcpkg dependencies
-        uses: actions/cache@v3
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
         with:
-          path: ${{ env.VCPKG_ROOT }}/installed
-          key: ${{ runner.os }}-${{ env.VCPKG_DEFAULT_TRIPLET }}-${{ hashFiles('vcpkg.json') }}
-
-      - name: Bootstrap vcpkg
-        run: |
-          if (-not (Test-Path "${{ env.VCPKG_ROOT }}/vcpkg.exe")) {
-            & "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
-          }
-        shell: pwsh
-
-      - name: Install dependencies
-        run: |
-          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" install --x-manifest-root="${{ github.workspace }}"
-        shell: pwsh
-      
-      - name: Integrate vcpkg with MSBuild
-        run: |
-          & "${{ env.VCPKG_ROOT }}/vcpkg.exe" integrate install
-        shell: pwsh
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          runVcpkgInstall: true
+          vcpkgTriplet: ${{ matrix.triplet }}
+          vcpkgJsonGlob: '**/vcpkg.json'
 
       - name: Add MSBuild to Path
         uses: microsoft/setup-msbuild@v1.1
 
       - name: Build C++ Code
         run: |
-          cl.exe /EHsc /std:c++17 main.cpp /I"${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/include"
+          cl.exe /EHsc /std:c++17 main.cpp /I"${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include" /link /LIBPATH:"${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
         shell: cmd
